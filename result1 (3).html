@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Prediction Result</title>
+  
+  <!-- Bootstrap + Leaflet + AOS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet" />
+
+  <style>
+    body {
+      background: linear-gradient(to right, #000000, #1a1a1a);
+      color: #f8f9fa;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .container {
+      margin-top: 40px;
+      padding: 30px;
+      background-color: #121212;
+      border-radius: 15px;
+      box-shadow: 0 8px 20px rgba(255, 255, 255, 0.05);
+    }
+    h1, h4, h5 {
+      color: #f1f1f1;
+    }
+    p, li, label {
+      color: #dcdcdc;
+    }
+    #map {
+      height: 300px;
+      width: 100%;
+      margin-top: 20px;
+      border-radius: 12px;
+      filter: grayscale(20%) brightness(0.9);
+    }
+    .card {
+      background-color: #1e1e1e;
+      border: 1px solid #333;
+    }
+    #chat-box {
+      border: 1px solid #555;
+      border-radius: 10px;
+      padding: 15px;
+      height: 300px;
+      overflow-y: auto;
+      background: #2a2a2a;
+      color: #f8f9fa;
+    }
+    .chat-input {
+      margin-top: 10px;
+      display: flex;
+    }
+    .chat-input input {
+      flex: 1;
+      margin-right: 10px;
+      background-color: #1a1a1a;
+      color: #fff;
+      border: 1px solid #444;
+    }
+    .language-switch {
+      position: absolute;
+      top: 15px;
+      right: 20px;
+      z-index: 1000;
+    }
+    select.form-select {
+      background-color: #1a1a1a;
+      color: #fff;
+      border: 1px solid #444;
+    }
+    .btn {
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 🌐 Language Dropdown -->
+  <div class="language-switch">
+    <select class="form-select form-select-sm" id="lang-select">
+      <option value="en">🌐 English</option>
+      <option value="hi">🇮🇳 Hindi</option>
+      <option value="kn">🇰🇳 Kannada</option>
+      <option value="ta">🇹🇳 Tamil</option>
+      <option value="ml">🇲🇱 Malayalam</option>
+    </select>
+  </div>
+
+  <div class="container col-md-8 offset-md-2" data-aos="fade-up">
+    <h1 class="text-center" data-i18n="result_title" data-aos="fade-down">💰 Predicted Property Price</h1>
+    <h4 class="text-center mt-3 text-success" data-aos="zoom-in">🏠 ₹ {{ price }} Lakhs</h4>
+
+    <p data-aos="fade-up"><strong data-i18n="location">📍 Location:</strong> {{ location }}</p>
+    <p data-aos="fade-up"><strong data-i18n="bhk">🏡 BHK:</strong> {{ bhk }} |
+       <strong data-i18n="bathrooms">🛁 Bath:</strong> {{ bath }} |
+       <strong data-i18n="sqft">📐 Area:</strong> {{ sqft }} sq.ft</p>
+
+    {% if lat and lng %}
+    <div id="map" data-aos="fade-up"></div>
+    <div class="mt-2 text-end" data-aos="fade-left">
+      <a class="btn btn-outline-light btn-sm" target="_blank"
+         href="https://www.google.com/maps/dir/?api=1&destination={{ lat }},{{ lng }}">
+        🧭 <span data-i18n="navigate">Navigate to Property</span>
+      </a>
+    </div>
+    {% endif %}
+
+<!-- 📈 Price Trend -->
+<div class="card mt-5 p-4" data-aos="fade-up">
+  <h5 data-i18n="trend">📈 Price Trend in {{ location }}</h5>
+  <canvas id="trendChart"></canvas>
+</div>
+
+<script>
+  const trendData = {{ trend_data | tojson }};
+  const labels = Object.keys(trendData);
+  const prices = Object.values(trendData);
+
+  new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Avg Price (Lakh ₹)",
+        data: prices,
+        borderColor: "#4bc0c0",
+        backgroundColor: "rgba(75,192,192,0.4)",
+        fill: true,
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: true }
+      },
+      scales: {
+        y: {
+          title: { display: true, text: "Price in Lakh ₹" },
+          beginAtZero: false
+        }
+      }
+    }
+  });
+</script>
+
+    <!-- 🤖 Chatbot -->
+    <h5 class="mt-5" data-i18n="ask_bot" data-aos="zoom-in">🤖 Ask Our Real Estate Assistant</h5>
+    <div id="chat-box" data-aos="fade-up"></div>
+    <div class="chat-input" data-aos="fade-up">
+      <input type="text" id="userInput" class="form-control" placeholder="e.g., Suggest budget homes in Whitefield">
+      <button class="btn btn-primary" onclick="sendChat()" data-i18n="ask">Ask</button>
+    </div>
+
+    <!-- 🔁 Back + PDF -->
+    <!-- 🔁 PDF Download Button -->
+   <div class="mt-4 text-center" data-aos="fade-up">
+     <button class="btn btn-success" onclick="downloadPDF()" data-i18n="download_pdf">📥 Download PDF</button>
+   </div>
+
+  
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+  <script>AOS.init();</script>
+  <script src="/static/lang.js"></script>
+
+  {% if lat and lng %}
+  <script>
+    var map = L.map('map').setView([{{ lat }}, {{ lng }}], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19
+    }).addTo(map);
+    L.marker([{{ lat }}, {{ lng }}]).addTo(map).bindPopup("🏠 Your Property Location").openPopup();
+  </script>
+  {% endif %}
+
+  {% if lat and lng and show_auto_nearby %}
+  <script>
+    async function loadNearbyAmenities(lat, lng) {
+      const query = `
+        [out:json];
+        (
+          node["amenity"~"school|hospital|college|clinic|pharmacy|university|marketplace|mall"](around:1500,${lat},${lng});
+        );
+        out body;
+      `;
+      try {
+        const response = await fetch("https://overpass-api.de/api/interpreter", {
+          method: "POST",
+          body: query
+        });
+        const data = await response.json();
+        data.elements.forEach(place => {
+          if (place.lat && place.lon) {
+            L.marker([place.lat, place.lon]).addTo(map)
+              .bindPopup("🏥 Nearby: " + (place.tags.name || place.tags.amenity));
+          }
+        });
+      } catch (err) {
+        console.error("Nearby amenities failed to load:", err);
+      }
+    }
+    loadNearbyAmenities({{ lat }}, {{ lng }});
+  </script>
+  {% endif %}
+
+  <script>
+    const ctx = document.getElementById('trendChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['2020', '2021', '2022', '2023', '2024'],
+        datasets: [{
+          label: 'Estimated Avg Price (Lakhs)',
+          data: {{ trend_data | tojson }},
+          borderColor: '#4caf50',
+          backgroundColor: 'rgba(76, 175, 80, 0.2)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'top', labels: { color: '#fff' } },
+          title: {
+            display: true,
+            text: '📊 Simulated Price Growth (2020–2024) in {{ location }}',
+            color: '#fff'
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#ccc' } },
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: 'Price (Lakhs)', color: '#ccc' },
+            ticks: { color: '#ccc' }
+          }
+        }
+      }
+    });
+  </script>
+
+  <script>
+    function sendChat() {
+      const input = document.getElementById("userInput");
+      const message = input.value.trim();
+      if (message === "") return;
+
+      const chatBox = document.getElementById("chat-box");
+      chatBox.innerHTML += `<p><strong>You:</strong> ${message}</p>`;
+      input.value = "";
+
+      fetch("/chat", {
+        method: "POST",
+        body: JSON.stringify({ message }),
+        headers: { "Content-Type": "application/json" }
+      })
+      .then(res => res.json())
+      .then(data => {
+        chatBox.innerHTML += `<p><strong>Bot:</strong> ${data.reply}</p>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+      })
+      .catch(() => {
+        chatBox.innerHTML += `<p class="text-danger">❌ Bot failed to respond.</p>`;
+      });
+    }
+
+    async function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const element = document.querySelector('.container');
+      const canvas = await html2canvas(element, { scale: 2 });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const imgProps = pdf.getImageProperties(imgData);
+      const ratio = imgProps.width / imgProps.height;
+      const pdfWidth = pageWidth - 20;
+      const pdfHeight = pdfWidth / ratio;
+      pdf.addImage(imgData, 'PNG', 10, 10, pdfWidth, pdfHeight);
+      pdf.save('Property_Prediction.pdf');
+    }
+  </script>
+</body>
+</html>
